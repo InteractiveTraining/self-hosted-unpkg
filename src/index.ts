@@ -6,6 +6,8 @@ import * as helmet from 'helmet';
 import {CloudflareChallenge} from '@interactivetraining/le-challenge-cloudflare';
 import {IPackageParams} from './interfaces';
 import {downloadPackage} from './helpers';
+import {GCloudStoreCreate} from '@interactivetraining/le-store-gcloud-storage'
+import * as http from 'http';
 
 require('dotenv').config();
 
@@ -53,24 +55,36 @@ app.get(['/:scope?/:package@:version/*', '/:scope?/:package/*'], async (req, res
   }
 });
 
-require('greenlock-express').create({
-  version: 'draft-11',
-  server: 'https://acme-v02.api.letsencrypt.org/directory',
-  email: process.env.LETS_ENCRYPT_EMAIL,
-  agreeTos: (process.env.LETS_ENCRYPT_AGREE_TO_TOS.trim() === 'true'),
-  approveDomains: [
-    process.env.DOMAIN
-  ],
-  configDir: 'acme/',
-  app: app,
-  challengeType: 'dns-01',
-  challenge: new CloudflareChallenge({
-    cloudflare: {
-      email: process.env.CLOUDFLARE_EMAIL,
-      key: process.env.CLOUDFLARE_API_KEY
-    },
-    acmePrefix: '_acme-challenge',
-    verifyPropagation: {waitFor: 5000, retries: 50},
-    useDNSOverHTTPS: false
-  })
-}).listen(80, 443, () => console.log(`Listening...`));
+if (process.env.ENABLE_SSL === "1") {
+  require('greenlock-express').create({
+    version: 'draft-11',
+    server: 'https://acme-v02.api.letsencrypt.org/directory',
+    //server: 'https://acme-staging-v02.api.letsencrypt.org/directory',
+    email: process.env.LETS_ENCRYPT_EMAIL,
+    agreeTos: (process.env.LETS_ENCRYPT_AGREE_TO_TOS.trim() === 'true'),
+    approveDomains: [
+      process.env.DOMAIN
+    ],
+    configDir: 'acme/',
+    app: app,
+    store: GCloudStoreCreate({
+      bucketName: process.env.GOOGLE_CLOUD_BUCKET_NAME,
+      projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+      keyFilename: process.env.GOOGLE_CLOUD_KEY_FILE_PATH,
+      dbFileName: process.env.GOOGLE_CLOUD_CERT_DB_FILE
+    }),
+    challengeType: 'dns-01',
+    challenge: new CloudflareChallenge({
+      cloudflare: {
+        email: process.env.CLOUDFLARE_EMAIL,
+        key: process.env.CLOUDFLARE_API_KEY
+      },
+      acmePrefix: '_acme-challenge',
+      verifyPropagation: {waitFor: 5000, retries: 50},
+      useDNSOverHTTPS: false
+    })
+  }).listen(80, 443, () => console.log(`Listening...`));
+} else {
+  http.createServer(app).listen(80, () => console.log(`Listening...`));
+}
+
