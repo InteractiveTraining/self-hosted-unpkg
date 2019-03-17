@@ -70,8 +70,9 @@ if (process.env.ENABLE_SSL === "1") {
     store: GCloudStoreCreate({
       bucketName: process.env.GOOGLE_CLOUD_BUCKET_NAME,
       projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
-      keyFilename: process.env.GOOGLE_CLOUD_KEY_FILE_PATH,
-      dbFileName: process.env.GOOGLE_CLOUD_CERT_DB_FILE
+      dbFileName: process.env.GOOGLE_CLOUD_CERT_DB_FILE,
+      privateKey: process.env.GOOGLE_CLOUD_PRIVATE_KEY.trim(),
+      clientEmail: process.env.GOOGLE_CLOUD_CLIENT_EMAIL
     }),
     challengeType: 'dns-01',
     challenge: new CloudflareChallenge({
