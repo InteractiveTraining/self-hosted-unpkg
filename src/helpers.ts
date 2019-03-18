@@ -25,3 +25,16 @@ export async function downloadPackage(pkg: IPackageParams, directory: string) {
     dir: directory
   });
 }
+
+export function jsonEscape(str: string) {
+  return str.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
+}
+
+/**
+ * Converts all \n to new lines and returns key.
+ * (solves issue only found when loaded using kubernetes secrets)
+ */
+export function getGCloudPrivateKey() {
+  const obj = JSON.parse(jsonEscape('{"k": "' + process.env.GOOGLE_CLOUD_PRIVATE_KEY.trim() + '"}'));
+  return obj.k;
+}

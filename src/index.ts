@@ -5,7 +5,7 @@ import * as compression from 'compression';
 import * as helmet from 'helmet';
 import {CloudflareChallenge} from '@interactivetraining/le-challenge-cloudflare';
 import {IPackageParams} from './interfaces';
-import {downloadPackage} from './helpers';
+import {downloadPackage, getGCloudPrivateKey} from './helpers';
 import {GCloudStoreCreate} from '@interactivetraining/le-store-gcloud-storage'
 import * as http from 'http';
 
@@ -71,7 +71,7 @@ if (process.env.ENABLE_SSL === "1") {
       bucketName: process.env.GOOGLE_CLOUD_BUCKET_NAME,
       projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
       dbFileName: process.env.GOOGLE_CLOUD_CERT_DB_FILE,
-      privateKey: process.env.GOOGLE_CLOUD_PRIVATE_KEY.trim(),
+      privateKey: getGCloudPrivateKey(),
       clientEmail: process.env.GOOGLE_CLOUD_CLIENT_EMAIL
     }),
     challengeType: 'dns-01',
