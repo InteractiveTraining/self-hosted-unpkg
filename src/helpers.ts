@@ -1,10 +1,11 @@
-import {IPackageParams} from './interfaces';
+import {IPackageParams, TreeNode} from './interfaces';
 import * as https from "https";
 import {RequestOptions} from "https";
 import * as gunzipMaybe from 'gunzip-maybe';
 import * as mime from 'mime-types';
 import * as tar from 'tar-stream';
 import {storage} from './storage';
+import {File} from '@google-cloud/storage';
 
 export function getRegistryOptions() {
   let options: RequestOptions = {};
@@ -76,4 +77,43 @@ export function jsonEscape(str: string) {
 export function getGCloudPrivateKey() {
   const obj = JSON.parse(jsonEscape('{"k": "' + process.env.GOOGLE_CLOUD_PRIVATE_KEY.trim() + '"}'));
   return obj.k;
+}
+
+// https://stackoverflow.com/a/51012811
+export function filesToTreeNodes(arr: Partial<File>[]): TreeNode[] {
+  let tree: any = {};
+  
+  function addnode(obj: File) {
+    let splitpath = obj.name.replace(/^\/|\/$/g, "").split('/');
+    let ptr = tree;
+    for (let i = 0; i < splitpath.length; i++) {
+      let node: any = {
+        name: splitpath[i],
+        isDirectory: true
+      };
+      if (i == splitpath.length - 1) {
+        node.isDirectory = false;
+        node.size = obj.metadata.size;
+      }
+      ptr[splitpath[i]] = ptr[splitpath[i]] || node;
+      ptr[splitpath[i]].children = ptr[splitpath[i]].children || {};
+      ptr = ptr[splitpath[i]].children;
+    }
+  }
+  
+  function objectToArr(node: TreeNode) {
+    Object.keys(node || {}).map((k) => {
+      if (node[k].children) {
+        objectToArr(node[k]);
+      }
+    });
+    if (node.children) {
+      node.children = Object.values(node.children);
+      node.children.forEach(objectToArr);
+    }
+  }
+  
+  arr.map(addnode);
+  objectToArr(tree);
+  return Object.values(tree);
 }

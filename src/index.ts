@@ -4,10 +4,10 @@ import * as express from 'express';
 import * as cors from 'cors';
 import * as compression from 'compression';
 import * as helmet from 'helmet';
-import {downloadPackage, getGCloudPrivateKey, getLatestVersion} from './helpers';
+import {downloadPackage, filesToTreeNodes, getGCloudPrivateKey, getLatestVersion} from './helpers';
 import * as http from 'http';
 import * as https from 'https';
-import {IPackageParams} from './interfaces';
+import {IPackageParams, IPackageQuery} from './interfaces';
 import * as mime from 'mime-types';
 import {storage} from './storage';
 import {AcmeClient} from '@interactivetraining/acme-client';
@@ -22,6 +22,7 @@ import {AcmeClient} from '@interactivetraining/acme-client';
   app.get(['/:scope?/:package@:version/*', '/:scope?/:package/*'], async (req, res) => {
     try {
       let params: IPackageParams = req.params;
+      let query: IPackageQuery = req.query || {tree: true};
       
       // correct the params.package value when there isn't a scope or version provided
       if (!params.version && params.scope && !req.url.split('/')[1].includes('@')) {
@@ -42,15 +43,31 @@ import {AcmeClient} from '@interactivetraining/acme-client';
       const packagePath = `cache/${(params.scope) ? `${params.scope}/` : ``}${params.package}/${params.version}/package`;
       const filePath = `${packagePath}/${params['0']}`;
       
-      const exists = (await storage.bucket(process.env.GOOGLE_CLOUD_CACHE_BUCKET_NAME).file(filePath).exists())[0];
-      if (!exists || params.version === 'latest') {
-        await downloadPackage(params);
+      // if file path is empty - respond with directory listing
+      if (params['0'] === '') {
+        const files = (await storage.bucket(process.env.GOOGLE_CLOUD_CACHE_BUCKET_NAME).getFiles({directory: packagePath}))[0].map(file => {
+          return {...file, name: file.name.replace(`${packagePath}/`, '')}
+        });
+        const directoryListing = (!query.hasOwnProperty('flat')) ? filesToTreeNodes(files) : files.map(file => {
+          return {
+            name: file.name,
+            size: file.metadata.size
+          }
+        });
+        
+        res.setHeader('Content-Type', 'application/json');
+        res.status(200).send(directoryListing);
+      } else {
+        const exists = (await storage.bucket(process.env.GOOGLE_CLOUD_CACHE_BUCKET_NAME).file(filePath).exists())[0];
+        if (!exists || params.version === 'latest') {
+          await downloadPackage(params);
+        }
+        
+        res.setHeader('Content-Type', mime.lookup(filePath));
+        res.setHeader('Cache-Control', (!params.version.includes('.')) ? 'no-cache' : 'public, max-age=31536000');
+        
+        storage.bucket(process.env.GOOGLE_CLOUD_CACHE_BUCKET_NAME).file(filePath).createReadStream().pipe(res);
       }
-      
-      res.setHeader('Content-Type', mime.lookup(filePath));
-      res.setHeader('Cache-Control', (!params.version.includes('.')) ? 'no-cache' : 'public, max-age=31536000');
-      
-      storage.bucket(process.env.GOOGLE_CLOUD_CACHE_BUCKET_NAME).file(filePath).createReadStream().pipe(res);
     } catch (e) {
       console.log(e);
       const status = (e.hasOwnProperty('statusCode')) ? e.statusCode : 500;
