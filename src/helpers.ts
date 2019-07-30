@@ -1,28 +1,67 @@
-import * as downloadTarball from 'download-package-tarball';
-import * as got from 'got';
 import {IPackageParams} from './interfaces';
+import * as https from "https";
+import {RequestOptions} from "https";
+import * as gunzipMaybe from 'gunzip-maybe';
+import * as mime from 'mime-types';
+import * as tar from 'tar-stream';
+import {storage} from './storage';
 
-export async function downloadPackage(pkg: IPackageParams, directory: string) {
-  let gotOpts: any = {};
+export function getRegistryOptions() {
+  let options: RequestOptions = {};
   
   if (process.env.NPM_TOKEN.trim() && process.env.NPM_TOKEN.trim().length > 0) {
-    gotOpts.headers = {authorization: `Bearer ${process.env.NPM_TOKEN.trim()}`};
+    options.headers = {authorization: `Bearer ${process.env.NPM_TOKEN.trim()}`};
   } else {
-    gotOpts.auth = `${process.env.NPM_USER}:${process.env.NPM_PASSWORD}`;
+    options.auth = `${process.env.NPM_USER}:${process.env.NPM_PASSWORD}`;
   }
   
-  if (!pkg.version.includes('.')) {
-    const {body} = await got(`${process.env.NPM_REGISTRY}/${(pkg.scope) ? `${pkg.scope}/` : ''}${pkg.package}`, {
-      ...gotOpts,
-      json: true
+  return options;
+}
+
+export async function getLatestVersion(pkg: IPackageParams): Promise<string> {
+  return new Promise(resolve => {
+    https.get(`${process.env.NPM_REGISTRY}/${(pkg.scope) ? `${pkg.scope}/` : ''}${pkg.package}`, getRegistryOptions(), (res) => {
+      let body = '';
+      res.on('data', (e: Buffer) => body += e.toString('utf-8'));
+      res.on('end', () => resolve(JSON.parse(body)['dist-tags'][pkg.version]));
+    })
+  });
+}
+
+export async function downloadPackage(pkg: IPackageParams) {
+  return new Promise(async resolve => {
+    const cachePath = `cache/${(pkg.scope) ? `${pkg.scope}/` : ''}${pkg.package}/${pkg.version}/`;
+    const registryUrl = `${process.env.NPM_REGISTRY}/${(pkg.scope) ? `${pkg.scope}/` : ''}${pkg.package}/-/${pkg.package}-${pkg.version}.tgz`;
+    const extract = tar.extract();
+    
+    extract.on('entry', (header, stream: NodeJS.ReadableStream, next) => {
+      let fileContent = '';
+      stream.on('data', (e: Buffer) => fileContent += e.toString('utf-8'));
+      stream.on('end', () => {
+        storage
+          .bucket(process.env.GOOGLE_CLOUD_CACHE_BUCKET_NAME)
+          .file(cachePath + header.name)
+          .save(fileContent, {
+            contentType: mime.lookup(header.name),
+            metadata: {
+              cacheControl: 'public, max-age=31536000'
+            },
+            public: true,
+            origin: '*'
+          }).then(() => {
+          console.log('cached: ' + cachePath + header.name);
+          if ((header.name as string).slice('package/'.length) === pkg['0']) resolve();
+        }).catch(reason => console.error('failed: ' + cachePath + header.name, reason));
+        
+        next();
+      });
+      
+      stream.resume();
     });
-    pkg.version = body['dist-tags'][pkg.version];
-  }
-  
-  await downloadTarball({
-    url: `${process.env.NPM_REGISTRY}/${(pkg.scope) ? `${pkg.scope}/` : ''}${pkg.package}/-/${pkg.package}-${pkg.version}.tgz`,
-    gotOpts: gotOpts,
-    dir: directory
+    
+    //extract.on('finish', () => {});
+    
+    https.get(registryUrl, getRegistryOptions(), (res) => res.pipe(gunzipMaybe()).pipe(extract)).on('error', (e) => console.error(e));
   });
 }
 
