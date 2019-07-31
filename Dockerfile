@@ -1,6 +1,6 @@
 FROM node:10
 
-LABEL version="0.0.1"
+LABEL version="0.0.3"
 
 WORKDIR /usr/src/app
 
@@ -8,9 +8,6 @@ COPY . .
 
 RUN npm install
 
-EXPOSE 443
-EXPOSE 80
-
-VOLUME /usr/src/app/cache
+VOLUME /usr/src/app
 
 CMD [ "npm", "run", "start" ]

@@ -4,7 +4,7 @@
 Create .env file. (see sample.env) and run:
 
 ```bash
-docker run -it --rm -p 443:443 -p 80:80 -v /local/path/to/cache:/usr/src/app/cache --env-file ./.env --name self-hosted-unpkg interactivetraining/self-hosted-unpkg
+docker run -it --rm -p 443:443 -p 80:80 --env-file ./.env --name self-hosted-unpkg interactivetraining/self-hosted-unpkg
 ```
 
 ## Kubernetes Deployment

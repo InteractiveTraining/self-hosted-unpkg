@@ -4,12 +4,11 @@ import * as express from 'express';
 import * as cors from 'cors';
 import * as compression from 'compression';
 import * as helmet from 'helmet';
-import {downloadPackage, filesToTreeNodes, getGCloudPrivateKey, getLatestVersion} from './helpers';
+import {downloadFile, getGCloudPrivateKey, getLatestVersion, getPackageFileList} from './helpers';
 import * as http from 'http';
 import * as https from 'https';
-import {IPackageParams, IPackageQuery} from './interfaces';
+import {IPackageParams} from './interfaces';
 import * as mime from 'mime-types';
-import {storage} from './storage';
 import {AcmeClient} from '@interactivetraining/acme-client';
 
 (async () => {
@@ -22,7 +21,6 @@ import {AcmeClient} from '@interactivetraining/acme-client';
   app.get(['/:scope?/:package@:version/*', '/:scope?/:package/*'], async (req, res) => {
     try {
       let params: IPackageParams = req.params;
-      let query: IPackageQuery = req.query || {tree: true};
       
       // correct the params.package value when there isn't a scope or version provided
       if (!params.version && params.scope && !req.url.split('/')[1].includes('@')) {
@@ -41,30 +39,20 @@ import {AcmeClient} from '@interactivetraining/acme-client';
         return;
       }
       
-      const packagePath = `cache/${(params.scope) ? `${params.scope}/` : ``}${params.package}/${params.version}/package`;
-      const filePath = `${packagePath}/${params['0']}`;
+      console.log(`request: ${(params.scope) ? `${params.scope}/` : ``}${params.package}@${params.version} - ${params['0']}`);
+      
+      // cache for 1 year
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
       
       // if file path is empty - respond with directory listing
       if (params['0'] === '') {
-        const files = (await storage.bucket(process.env.GOOGLE_CLOUD_CACHE_BUCKET_NAME).getFiles({directory: packagePath}))[0].map(file => {
-          return {...file, name: file.name.replace(`${packagePath}/`, '')}
-        });
-        const directoryListing = (!query.hasOwnProperty('flat')) ? filesToTreeNodes(files) : files.map(file => {
-          return {
-            name: file.name,
-            size: file.metadata.size,
-            modified: file
-          }
-        });
-        
         res.setHeader('Content-Type', 'application/json');
-        res.status(200).send(directoryListing);
+        res.status(200).send(await getPackageFileList(params));
       } else {
-        console.log(`request: ${(params.scope) ? `${params.scope}/` : ``}${params.package}@${params.version} - ${params['0']}`);
+        const file = await downloadFile(params);
         
-        res.setHeader('Content-Type', mime.lookup(filePath));
-        res.setHeader('Cache-Control', 'public, max-age=31536000');
-        res.status(200).send(await downloadPackage(params));
+        res.setHeader('Content-Type', mime.lookup(params['0']));
+        res.status(200).send(file);
       }
     } catch (e) {
       console.log(e);
