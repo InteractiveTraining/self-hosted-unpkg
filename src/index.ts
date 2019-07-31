@@ -68,8 +68,8 @@ import {AcmeClient} from '@interactivetraining/acme-client';
       }
     } catch (e) {
       console.log(e);
-      const status = (e.hasOwnProperty('statusCode')) ? e.statusCode : 500;
-      const message = (e.hasOwnProperty('statusMessage')) ? e.statusMessage : e.message;
+      const status = (e && e.hasOwnProperty('statusCode')) ? e.statusCode : 500;
+      const message = (e && e.hasOwnProperty('statusMessage')) ? e.statusMessage : 'unknown error';
       res.status(status).send(message);
     }
   });
