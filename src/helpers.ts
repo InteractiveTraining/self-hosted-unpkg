@@ -95,8 +95,8 @@ export async function downloadPackage(pkg: IPackageParams): Promise<Extract> {
 }
 
 export async function getPackageFileList(pkg: IPackageParams): Promise<string | string[]> {
+  const extract = await downloadPackage(pkg);
   return new Promise(async resolve => {
-    const extract = await downloadPackage(pkg);
     const arr = [];
     
     extract.on('entry', (header, stream: NodeJS.ReadableStream, next) => {
