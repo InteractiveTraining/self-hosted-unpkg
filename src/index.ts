@@ -36,9 +36,10 @@ import {AcmeClient} from '@interactivetraining/acme-client';
       
       if (!params.version.includes('.')) {
         params.version = await getLatestVersion(params);
+        res.setHeader('Cache-Control', 'no-cache');
+        res.redirect(302, `/${(params.scope) ? `${params.scope}/` : ``}${params.package}@${params.version}/${params['0']}`);
+        return;
       }
-      
-      console.log(`request: ${(params.scope) ? `${params.scope}/` : ``}${params.package}@${params.version} - ${params['0']}`);
       
       const packagePath = `cache/${(params.scope) ? `${params.scope}/` : ``}${params.package}/${params.version}/package`;
       const filePath = `${packagePath}/${params['0']}`;
@@ -51,22 +52,19 @@ import {AcmeClient} from '@interactivetraining/acme-client';
         const directoryListing = (!query.hasOwnProperty('flat')) ? filesToTreeNodes(files) : files.map(file => {
           return {
             name: file.name,
-            size: file.metadata.size
+            size: file.metadata.size,
+            modified: file
           }
         });
         
         res.setHeader('Content-Type', 'application/json');
         res.status(200).send(directoryListing);
       } else {
-        const exists = (await storage.bucket(process.env.GOOGLE_CLOUD_CACHE_BUCKET_NAME).file(filePath).exists())[0];
-        if (!exists || params.version === 'latest') {
-          await downloadPackage(params);
-        }
+        console.log(`request: ${(params.scope) ? `${params.scope}/` : ``}${params.package}@${params.version} - ${params['0']}`);
         
         res.setHeader('Content-Type', mime.lookup(filePath));
-        res.setHeader('Cache-Control', (!params.version.includes('.')) ? 'no-cache' : 'public, max-age=31536000');
-        
-        storage.bucket(process.env.GOOGLE_CLOUD_CACHE_BUCKET_NAME).file(filePath).createReadStream().pipe(res);
+        res.setHeader('Cache-Control', 'public, max-age=31536000');
+        res.status(200).send(await downloadPackage(params));
       }
     } catch (e) {
       console.log(e);
