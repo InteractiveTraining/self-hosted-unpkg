@@ -5,7 +5,7 @@ import * as gunzipMaybe from 'gunzip-maybe';
 import * as tar from 'tar-stream';
 import {Extract} from 'tar-stream';
 import * as http from "http";
-import {cache} from './cache';
+import {Cache} from './cache';
 
 export function getRegistryOptions(): RequestOptions {
   let options: RequestOptions = {};
@@ -21,10 +21,6 @@ export function getRegistryOptions(): RequestOptions {
 
 export function getPackageUrl(pkg: IPackageParams): string {
   return `${process.env.NPM_REGISTRY}/${(pkg.scope) ? `${pkg.scope}/` : ''}${pkg.package}`;
-}
-
-export function getCacheKey(pkg: IPackageParams): string {
-  return `cache/${(pkg.scope) ? `${pkg.scope}/` : ''}${pkg.package}/${pkg.version}/`;
 }
 
 export async function getLatestVersion(pkg: IPackageParams): Promise<string> {
@@ -47,30 +43,36 @@ export async function getLatestVersion(pkg: IPackageParams): Promise<string> {
 
 export async function downloadFile(pkg: IPackageParams): Promise<string> {
   return new Promise(async (resolve, reject) => {
-    const cachePath = getCacheKey(pkg);
-    
-    if (!cache.has(cachePath + pkg['0'])) {
-      const extract = await downloadPackage(pkg);
+    try {
+      const cachePath = Cache.buildKey(pkg);
+      const redisValue = await Cache.get(cachePath);
       
-      extract.on('entry', (header, stream: NodeJS.ReadableStream, next) => {
-        let fileContent = '';
-        stream.on('data', (e: Buffer) => fileContent += e.toString('utf-8'));
-        stream.on('end', () => {
-          cache.set(cachePath + (header.name as string).slice('package/'.length), fileContent);
-          
-          if ((header.name as string).slice('package/'.length) === pkg['0']) {
-            resolve(fileContent);
-          }
-          next();
-        });
-        
-        stream.resume();
-      });
-      
-      extract.on('finish', () => reject({statusCode: 404, statusMessage: 'Not found'}));
-    } else {
-      console.log('--from cache---', cache.itemCount);
-      resolve((cache.get(cachePath + pkg['0']) as string));
+      if (!redisValue) {
+        (await downloadPackage(pkg))
+          .on('entry', (header, stream: NodeJS.ReadableStream, next) => {
+            const filePath = (header.name as string).slice('package/'.length);
+            const chunks = [];
+            stream
+              .on('data', chunk => chunks.push(chunk))
+              .on('end', async () => {
+                const fileContent = Buffer.concat(chunks).toString('utf-8');
+                
+                await Cache.set(Cache.buildKey({...pkg, '0': filePath}), fileContent, 60 * 45);
+                
+                if (filePath === pkg['0']) {
+                  resolve(fileContent);
+                }
+                next();
+              });
+            
+            stream.resume();
+          })
+          .on('finish', () => reject({statusCode: 404, statusMessage: 'Not found'}));
+      } else {
+        resolve(redisValue as any);
+      }
+    } catch (e) {
+      reject(e);
     }
   });
 }
@@ -95,17 +97,18 @@ export async function downloadPackage(pkg: IPackageParams): Promise<Extract> {
 }
 
 export async function getPackageFileList(pkg: IPackageParams): Promise<string | string[]> {
-  const extract = await downloadPackage(pkg);
-  return new Promise(async resolve => {
-    const arr = [];
-    
-    extract.on('entry', (header, stream: NodeJS.ReadableStream, next) => {
-      arr.push((header.name as string).slice('package/'.length));
-      next();
-      stream.resume();
-    });
-    
-    extract.on('finish', () => resolve(arr));
+  return new Promise(async (resolve, reject) => {
+    try {
+      const arr = [];
+      (await downloadPackage(pkg))
+        .on('entry', (header, stream: NodeJS.ReadableStream, next) => {
+          arr.push((header.name as string).slice('package/'.length));
+          next();
+          stream.resume();
+        }).on('finish', () => resolve(arr));
+    } catch (e) {
+      reject(e);
+    }
   });
 }
 

@@ -1,15 +1,15 @@
 require('dotenv').config();
 
+import {IPackageParams} from './interfaces';
+import {AcmeClient} from '@interactivetraining/acme-client';
+import {downloadFile, getGCloudPrivateKey, getLatestVersion, getPackageFileList} from './helpers';
 import * as express from 'express';
 import * as cors from 'cors';
 import * as compression from 'compression';
 import * as helmet from 'helmet';
-import {downloadFile, getGCloudPrivateKey, getLatestVersion, getPackageFileList} from './helpers';
 import * as http from 'http';
 import * as https from 'https';
-import {IPackageParams} from './interfaces';
 import * as mime from 'mime-types';
-import {AcmeClient} from '@interactivetraining/acme-client';
 
 (async () => {
   const app = express();
@@ -39,7 +39,9 @@ import {AcmeClient} from '@interactivetraining/acme-client';
         return;
       }
       
-      console.log(`request: ${(params.scope) ? `${params.scope}/` : ``}${params.package}@${params.version} - ${params['0']}`);
+      if (process.env.LOG_REQUEST && process.env.LOG_REQUEST.toLowerCase() === "true") {
+        console.log(`request(${(req.headers && req.headers['x-forwarded-for']) ? req.headers['x-forwarded-for'] : ''}): ${(params.scope) ? `${params.scope}/` : ``}${params.package}@${params.version} - ${params['0']}`);
+      }
       
       // cache for 1 year
       res.setHeader('Cache-Control', 'public, max-age=31536000');
@@ -49,15 +51,13 @@ import {AcmeClient} from '@interactivetraining/acme-client';
         res.setHeader('Content-Type', 'application/json');
         res.status(200).send(await getPackageFileList(params));
       } else {
-        const file = await downloadFile(params);
-        
         res.setHeader('Content-Type', mime.lookup(params['0']));
-        res.status(200).send(file);
+        res.status(200).send(await downloadFile(params));
       }
     } catch (e) {
-      console.log(e);
       const status = (e && e.hasOwnProperty('statusCode')) ? e.statusCode : 500;
       const message = (e && e.hasOwnProperty('statusMessage')) ? e.statusMessage : 'unknown error';
+      if (status === 500) console.error(e);
       res.status(status).send(message);
     }
   });
@@ -89,7 +89,7 @@ import {AcmeClient} from '@interactivetraining/acme-client';
     }).getCert();
     https.createServer(acmeClient, app).listen(443, () => console.log(`Listening...`));
   } else {
-    http.createServer(app).listen(process.env.HTTP_PORT, () => console.log(`Listening...`));
+    http.createServer(app).listen(process.env.PORT || 8080, () => console.log(`Listening...`));
   }
 })();
 
