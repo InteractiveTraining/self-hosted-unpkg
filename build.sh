@@ -6,5 +6,14 @@ while [[ "$#" -gt 0 ]]; do case $1 in
 esac; shift; done
 
 npm run build
-docker build -t "interactivetraining/self-hosted-unpkg:$version" .
+
+docker build -t "interactivetraining/self-hosted-unpkg:latest" .
+docker tag "interactivetraining/self-hosted-unpkg:latest" "interactivetraining/self-hosted-unpkg:$version"
+docker tag "interactivetraining/self-hosted-unpkg:latest" "docker.pkg.github.com/interactivetraining/self-hosted-unpkg/self-hosted-unpkg:latest"
+docker tag "interactivetraining/self-hosted-unpkg:latest" "docker.pkg.github.com/interactivetraining/self-hosted-unpkg/self-hosted-unpkg:$version"
+
+docker push "interactivetraining/self-hosted-unpkg:latest"
 docker push "interactivetraining/self-hosted-unpkg:$version"
+
+docker push "docker.pkg.github.com/interactivetraining/self-hosted-unpkg/self-hosted-unpkg:latest"
+docker push "docker.pkg.github.com/interactivetraining/self-hosted-unpkg/self-hosted-unpkg:$version"
