@@ -24,3 +24,5 @@ dist/
 *.pem
 acme/
 cache/
+
+build-for-run.sh
