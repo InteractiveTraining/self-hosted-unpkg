@@ -18,4 +18,4 @@ docker run -it --rm -p 443:443 -p 80:80 --env-file ./.env --name self-hosted-unp
 
 
 
-[![Run on Google Cloud](https://storage.googleapis.com/cloudrun/button.svg)](https://console.cloud.google.com/cloudshell/editor?shellonly=true&cloudshell_image=gcr.io/cloudrun/button&cloudshell_git_repo=https://github.com/InteractiveTraining/self-hosted-unpkg&cloudshell_git_branch=run-test)
+[![Run on Google Cloud](https://storage.googleapis.com/cloudrun/button.svg)](https://console.cloud.google.com/cloudshell/editor?shellonly=true&cloudshell_image=gcr.io/cloudrun/button&cloudshell_git_repo=https://github.com/InteractiveTraining/self-hosted-unpkg)
