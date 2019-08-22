@@ -7,11 +7,11 @@ import {Extract} from 'tar-stream';
 import * as http from "http";
 import {Cache} from './cache';
 
-export function getRegistryOptions(): RequestOptions {
+export function getRegistryOptions(pkg?: IPackageParams): RequestOptions {
   let options: RequestOptions = {};
   
-  if (process.env.NPM_TOKEN && process.env.NPM_TOKEN.trim().length > 0) {
-    options.headers = {authorization: `Bearer ${process.env.NPM_TOKEN.trim()}`};
+  if ((process.env.NPM_TOKEN && process.env.NPM_TOKEN.trim().length > 0) || (pkg && pkg.query && pkg.query.npmrc)) {
+    options.headers = {authorization: `Bearer ${(pkg && pkg.query && pkg.query.npmrc) ? pkg.query.npmrc.trim() : process.env.NPM_TOKEN.trim()}`};
   } else {
     options.auth = `${process.env.NPM_USER}:${process.env.NPM_PASSWORD}`;
   }
@@ -45,7 +45,7 @@ export async function downloadFile(pkg: IPackageParams): Promise<string> {
   return new Promise(async (resolve, reject) => {
     try {
       const cachePath = Cache.buildKey(pkg);
-      const redisValue = await Cache.get(cachePath);
+      const redisValue = (pkg.query.npmrc) ? undefined : await Cache.get(cachePath);
       
       if (!redisValue) {
         (await downloadPackage(pkg))
@@ -56,8 +56,9 @@ export async function downloadFile(pkg: IPackageParams): Promise<string> {
               .on('data', chunk => chunks.push(chunk))
               .on('end', async () => {
                 const fileContent = Buffer.concat(chunks).toString('utf-8');
-                
-                await Cache.set(Cache.buildKey({...pkg, '0': filePath}), fileContent, 60 * 45);
+                if (!pkg.query.npmrc) {
+                  await Cache.set(Cache.buildKey({...pkg, '0': filePath}), fileContent, 60 * 45);
+                }
                 
                 if (filePath === pkg['0']) {
                   resolve(fileContent);
@@ -81,7 +82,7 @@ export async function downloadPackage(pkg: IPackageParams): Promise<Extract> {
   return new Promise(async (resolve, reject) => {
     const extract = tar.extract();
     
-    https.get(`${getPackageUrl(pkg)}/-/${pkg.package}-${pkg.version}.tgz`, getRegistryOptions(), (res: http.IncomingMessage) => {
+    https.get(`${getPackageUrl(pkg)}/-/${pkg.package}-${pkg.version}.tgz`, getRegistryOptions(pkg), (res: http.IncomingMessage) => {
       if (res.statusCode !== 200) {
         reject({statusCode: res.statusCode, statusMessage: res.statusMessage});
         return;

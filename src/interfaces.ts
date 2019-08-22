@@ -3,4 +3,5 @@ export interface IPackageParams {
   package: string;
   version?: string;
   0?: string;
+  query?: any;
 }
