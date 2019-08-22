@@ -20,7 +20,7 @@ import * as mime from 'mime-types';
   
   app.get(['/:scope?/:package@:version/*', '/:scope?/:package/*'], async (req, res) => {
     try {
-      let params: IPackageParams = req.params;
+      let params: IPackageParams = (req.params as any);
       
       // correct the params.package value when there isn't a scope or version provided
       if (!params.version && params.scope && !req.url.split('/')[1].includes('@')) {

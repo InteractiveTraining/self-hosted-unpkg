@@ -1,11 +1,12 @@
 import * as Redis from 'ioredis';
 import {IPackageParams} from './interfaces';
 
-const redis = (process.env.REDIS_PORT && process.env.REDIS_HOST) ? new Redis({
-  port: parseInt(process.env.REDIS_PORT),
-  host: process.env.REDIS_HOST,
-  password: process.env.REDIS_PASSWORD
-}) : undefined;
+const redis = (process.env.REDIS_PORT && process.env.REDIS_HOST && process.env.REDIS_PORT.trim().length > 1 && process.env.REDIS_HOST.trim().length > 1)
+  ? new Redis({
+    port: parseInt(process.env.REDIS_PORT),
+    host: process.env.REDIS_HOST,
+    password: process.env.REDIS_PASSWORD
+  }) : undefined;
 
 export class Cache {
   static get(key: string): Promise<string | null> {
