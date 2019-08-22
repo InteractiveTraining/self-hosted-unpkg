@@ -1,0 +1,35 @@
+{
+  "name": "my-self-hosted-unpkg",
+  "env": {
+    "NPM_REGISTRY": {
+      "description": "You can provide your private repository here",
+      "value": "https://registry.npmjs.com",
+      "required": true
+    },
+    "NPM_TOKEN": {
+      "description": "Only required if you want to allow access to your private packages",
+      "value": " ",
+      "required": false
+    },
+    "REDIS_HOST": {
+      "description": "Redis is used to temporarily store packages to reduce load on the registry",
+      "value": " ",
+      "required": false
+    },
+    "REDIS_PORT": {
+      "description": "Redis is used to temporarily store packages to reduce load on the registry",
+      "value": "6379",
+      "required": false
+    },
+    "REDIS_PASSWORD": {
+      "description": "Redis is used to temporarily store packages to reduce load on the registry",
+      "value": " ",
+      "required": false
+    },
+    "CACHE_PREFIX": {
+      "description": "Redis is used to temporarily store packages to reduce load on the registry",
+      "value": "unpkg",
+      "required": true
+    }
+  }
+}

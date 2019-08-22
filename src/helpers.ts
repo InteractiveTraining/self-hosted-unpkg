@@ -10,7 +10,7 @@ import {Cache} from './cache';
 export function getRegistryOptions(): RequestOptions {
   let options: RequestOptions = {};
   
-  if (process.env.NPM_TOKEN.trim() && process.env.NPM_TOKEN.trim().length > 0) {
+  if (process.env.NPM_TOKEN && process.env.NPM_TOKEN.trim().length > 0) {
     options.headers = {authorization: `Bearer ${process.env.NPM_TOKEN.trim()}`};
   } else {
     options.auth = `${process.env.NPM_USER}:${process.env.NPM_PASSWORD}`;
