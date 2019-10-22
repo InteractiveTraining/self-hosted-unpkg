@@ -46,31 +46,36 @@ export async function downloadFile(pkg: IPackageParams): Promise<string> {
     try {
       const cachePath = Cache.buildKey(pkg);
       const redisValue = await Cache.get(cachePath);
+      const isDownloading = await Cache.checkIsDownloading(pkg);
       
-      if (!redisValue) {
-        (await downloadPackage(pkg))
-          .on('entry', (header, stream: NodeJS.ReadableStream, next) => {
-            const filePath = (header.name as string).slice('package/'.length);
-            const chunks = [];
-            stream
-              .on('data', chunk => chunks.push(chunk))
-              .on('end', async () => {
-                const fileContent = Buffer.concat(chunks).toString('utf-8');
-                
-                await Cache.set(Cache.buildKey({...pkg, '0': filePath}), fileContent, 60 * 45);
-                
-                if (filePath === pkg['0']) {
-                  resolve(fileContent);
-                }
-                next();
-              });
-            
-            stream.resume();
-          })
-          .on('finish', () => reject({statusCode: 404, statusMessage: 'Not found'}));
-      } else {
+      if (redisValue) {
         resolve(redisValue as any);
+      } else {
+        if (!isDownloading) {
+          await Cache.addIsDownloading(pkg);
+          (await downloadPackage(pkg))
+            .on('entry', async (header, stream: NodeJS.ReadableStream, next) => {
+              const filePath = (header.name as string).slice('package/'.length);
+              const chunks = [];
+              stream
+                .on('data', chunk => chunks.push(chunk))
+                .on('end', async () => {
+                  const fileContent = Buffer.concat(chunks).toString('utf-8');
+                  await Cache.set(Cache.buildKey({...pkg, '0': filePath}), fileContent, 60 * 45);
+                  
+                  if (filePath === pkg['0']) resolve(fileContent);
+                  next();
+                });
+              
+              stream.resume();
+            })
+            .on('finish', async () => {
+              await Cache.removeIsDownloading(pkg);
+              reject({statusCode: 404, statusMessage: 'Not found'});
+            });
+        } else await Cache.onDownload(cachePath, resolve);
       }
+      
     } catch (e) {
       reject(e);
     }
@@ -80,7 +85,6 @@ export async function downloadFile(pkg: IPackageParams): Promise<string> {
 export async function downloadPackage(pkg: IPackageParams): Promise<Extract> {
   return new Promise(async (resolve, reject) => {
     const extract = tar.extract();
-    
     https.get(`${getPackageUrl(pkg)}/-/${pkg.package}-${pkg.version}.tgz`, getRegistryOptions(), (res: http.IncomingMessage) => {
       if (res.statusCode !== 200) {
         reject({statusCode: res.statusCode, statusMessage: res.statusMessage});
