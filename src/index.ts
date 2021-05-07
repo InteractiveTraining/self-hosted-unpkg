@@ -80,7 +80,7 @@ import * as mime from 'mime-types';
       },
       fileNames: {
         cert: `${process.env.DOMAIN}-cert.pem`,
-        caCert: `${process.env.DOMAIN}-caCert.pem`,
+        // caCert: `${process.env.DOMAIN}-caCert.pem`,
         privateKey: `${process.env.DOMAIN}-private-key.pem`,
         accountKey: `${process.env.DOMAIN}-account-key.pem`
       },

@@ -26,3 +26,4 @@ acme/
 cache/
 
 build-for-run.sh
+.history/
